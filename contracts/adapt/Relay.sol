@@ -26,7 +26,7 @@ contract RelayAdapt is IERC721Receiver {
   // Set to true if contract is executing
   bool private isExecuting = false;
   mapping(address => uint256[]) receivedERC721;
-  mapping(address => bool) isReceivedERC721Unavailable;
+  mapping(address => bool) receivedERC721PendingShields;
 
   struct Call {
     address to;
@@ -120,10 +120,10 @@ contract RelayAdapt is IERC721Receiver {
         IERC721 token = IERC721(_shieldRequests[i].preimage.token.tokenAddress);
 
         if (
-          _shieldRequests[i].preimage.value == 0 &&
-          _shieldRequests[i].preimage.token.tokenSubID == 0
+          _shieldRequests[i].preimage.token.tokenSubID == type(uint256).max &&
+          receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length > 0
         ) {
-          if (!isReceivedERC721Unavailable[_shieldRequests[i].preimage.token.tokenAddress]) {
+          if (!receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress]) {
             for (
               uint256 j = 0;
               j < receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length;
@@ -136,7 +136,7 @@ contract RelayAdapt is IERC721Receiver {
               values[i] += 1;
               numValidTokens += 1;
             }
-            isReceivedERC721Unavailable[_shieldRequests[i].preimage.token.tokenAddress] = true;
+            receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress] = true;
           }
         } else {
           token.approve(address(railgun), _shieldRequests[i].preimage.token.tokenSubID);
@@ -177,8 +177,8 @@ contract RelayAdapt is IERC721Receiver {
         filteredIndex += 1;
       } else if (_shieldRequests[i].preimage.token.tokenType == TokenType.ERC721) {
         if (
-          _shieldRequests[i].preimage.value == 0 &&
-          _shieldRequests[i].preimage.token.tokenSubID == 0
+          _shieldRequests[i].preimage.token.tokenSubID == type(uint256).max &&
+          receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length > 0
         ) {
           for (
             uint256 j = 0;
@@ -193,7 +193,7 @@ contract RelayAdapt is IERC721Receiver {
             filteredIndex += 1;
           }
           delete receivedERC721[_shieldRequests[i].preimage.token.tokenAddress];
-          delete isReceivedERC721Unavailable[_shieldRequests[i].preimage.token.tokenAddress];
+          delete receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress];
         } else {
           filteredShieldRequests[filteredIndex] = _shieldRequests[i];
           filteredShieldRequests[filteredIndex].preimage.value = values[i];
