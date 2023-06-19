@@ -1,4 +1,5 @@
 import { HardhatUserConfig } from 'hardhat/config';
+require("dotenv").config();
 import '@nomicfoundation/hardhat-chai-matchers';
 import '@nomiclabs/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
@@ -14,6 +15,15 @@ import mocharc from './.mocharc.json';
 
 const config: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
+  networks: {
+    mumbai: {
+      url: process.env.POLYGON_MUMBAI_URL,
+      accounts: [process.env.PRIVATE_KEY],
+    },
+    goerli: {
+      url: process.env.GOERLI_URL,
+      accounts: [process.env.PRIVATE_KEY],
+    }},
   solidity: {
     compilers: [
       {
