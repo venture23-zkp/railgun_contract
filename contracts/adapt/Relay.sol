@@ -180,19 +180,20 @@ contract RelayAdapt is IERC721Receiver {
           _shieldRequests[i].preimage.token.tokenSubID == type(uint256).max &&
           receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length > 0
         ) {
+          uint loop = receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length;
           for (
             uint256 j = 0;
-            j < receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length;
+            j < loop;
             j += 1
           ) {
             filteredShieldRequests[filteredIndex] = _shieldRequests[i];
             filteredShieldRequests[filteredIndex].preimage.value = 1;
-            filteredShieldRequests[filteredIndex].preimage.token.tokenSubID = receivedERC721[
-              _shieldRequests[i].preimage.token.tokenAddress
-            ][j];
+            uint tokenId = receivedERC721[_shieldRequests[i].preimage.token.tokenAddress][loop-j-1];
+            receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].pop();
+            filteredShieldRequests[filteredIndex].preimage.token.tokenSubID = tokenId;
             filteredIndex += 1;
           }
-          delete receivedERC721[_shieldRequests[i].preimage.token.tokenAddress];
+//          delete receivedERC721[_shieldRequests[i].preimage.token.tokenAddress];
           delete receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress];
         } else {
           filteredShieldRequests[filteredIndex] = _shieldRequests[i];
