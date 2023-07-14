@@ -28,6 +28,7 @@ typechain
 typechain-types
 abi-exports
 storage-layouts
+.env
 
 # Temporary Files
 scripts/ephemeral
