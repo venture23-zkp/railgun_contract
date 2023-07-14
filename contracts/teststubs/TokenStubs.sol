@@ -21,6 +21,10 @@ contract TestERC721 is ERC721 {
   function mint(address _account, uint256 _tokenId) external {
     _mint(_account, _tokenId);
   }
+
+  function safeMint(address _account, uint256 _tokenId) external {
+    _safeMint(_account, _tokenId);
+  }
 }
 
 contract TestERC1155 is ERC1155 {
