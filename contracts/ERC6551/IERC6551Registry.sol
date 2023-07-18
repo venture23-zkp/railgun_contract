@@ -27,7 +27,6 @@ interface IERC6551Registry {
         uint256 chainId,
         address tokenContract,
         uint256 tokenId,
-        uint256 salt,
         bytes calldata initData
     ) external returns (address);
 

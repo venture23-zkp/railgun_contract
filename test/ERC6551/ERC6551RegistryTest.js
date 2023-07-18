@@ -43,14 +43,14 @@ describe("ERC6551 Registry",
           const chainId = BigInt(
               (await ethers.provider.send('eth_chainId', [])));
           const tokenAddress = ethers.constants.AddressZero;
-          const salt = 123;
           const initData = [];
+          const salt =0;
           const [acc1, acc2, acc3] = await ethers.getSigners();
 
           //creating an account with acc1
           const create = await registry.createAccount(account.address, chainId,
               tokenAddress,
-              0, salt, initData);
+              0, initData);
 
           // await expect(create).to.emit(registry, "AccountCreated").withArgs("",
           //     account.address, chainId, tokenAddress,
@@ -73,7 +73,7 @@ describe("ERC6551 Registry",
           //creating another account with acc1
           const create2 = await registry.createAccount(account.address, chainId,
               tokenAddress,
-              0, salt, initData);
+              0, initData);
 
           await expect(create2).to.emit(registry, "AccountCreated");
 
@@ -106,7 +106,7 @@ describe("ERC6551 Registry",
               (await ethers.provider.send('eth_chainId', [])));
           const tokenAddress = mockNft.address;
           const tokenId = 1;
-          const salt = 123;
+          const salt = 0;
           const initData = [];
 
           //Minting the nft
@@ -118,7 +118,7 @@ describe("ERC6551 Registry",
           //creating an account with acc1
           const create = await registry.createAccount(account.address, chainId,
               tokenAddress,
-              tokenId, salt, initData);
+              tokenId, initData);
 
           await expect(create).to.emit(registry, "AccountCreated");
 
@@ -141,7 +141,7 @@ describe("ERC6551 Registry",
           //creating another account with acc1
           const create2 = await registry.createAccount(account.address, chainId,
               tokenAddress,
-              tokenId2, salt, initData);
+              tokenId2, initData);
           await expect(create2).to.emit(registry, "AccountCreated");
 
           // getting the created account
@@ -166,7 +166,7 @@ describe("ERC6551 Registry",
               const chainId = BigInt(
                   (await ethers.provider.send('eth_chainId', [])));
               const zeroAddress = ethers.constants.AddressZero;
-              const salt = 123;
+              const salt = 0;
               //invalid init data
               const initData = [1];
               const [acc1, acc2, acc3] = await ethers.getSigners();
@@ -174,7 +174,7 @@ describe("ERC6551 Registry",
               //creating an account with invalid initData
               await expect(registry.createAccount(account.address, chainId,
                   zeroAddress,
-                  0, salt, initData)).to.be.revertedWithCustomError(registry,
+                  0, initData)).to.be.revertedWithCustomError(registry,
                   "InitializationFailed");
 
 
@@ -191,7 +191,7 @@ describe("ERC6551 Registry",
               // Invalid owner creating account for the NFT
               await expect(registry.createAccount(account.address, chainId,
                   tokenAddress,
-                  tokenId, salt, initData)).to.be.revertedWith(
+                  tokenId, initData)).to.be.revertedWith(
                   "createAccount caller is not an owner!")
 
             });

@@ -53,14 +53,14 @@ describe("Default ERC6551 Account ",
           const chainId = BigInt(
               (await ethers.provider.send('eth_chainId', [])));
           const tokenAddress = ethers.constants.AddressZero;
-          const salt = 123;
+          const salt = 0;
           const initData = [];
           const [acc1, acc2, acc3] = await ethers.getSigners();
 
           //creating an account with acc1
         await registry.createAccount(account.address, chainId,
               tokenAddress,
-              0, salt, initData);
+              0, initData);
 
 
           // getting the created account
@@ -97,14 +97,14 @@ describe("Default ERC6551 Account ",
           const chainId = BigInt(
               (await ethers.provider.send('eth_chainId', [])));
           const tokenAddress = ethers.constants.AddressZero;
-          const salt = 123;
+          const salt = 0;
           const initData = [];
           const [acc1, acc2, acc3] = await ethers.getSigners();
 
           //creating an account with acc1
           await registry.createAccount(account.address, chainId,
               tokenAddress,
-              0, salt, initData);
+              0, initData);
 
 
           // getting the created account
@@ -146,7 +146,7 @@ describe("Default ERC6551 Account ",
               (await ethers.provider.send('eth_chainId', [])));
           const tokenAddress = mockNft.address;
           const tokenId = 1;
-          const salt = 123;
+          const salt = 0;
           const initData = [];
 
           //Minting the nft
@@ -157,7 +157,7 @@ describe("Default ERC6551 Account ",
 
           //creating an account with acc1
           await registry.createAccount(account.address, chainId, tokenAddress,
-              tokenId, salt, initData);
+              tokenId, initData);
 
 
           // getting the created account
