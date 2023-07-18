@@ -20,7 +20,6 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
         uint256 chainId,
         address tokenContract,
         uint256 tokenId,
-        uint256 salt,
         bytes calldata initData
     ) external returns (address) {
         // mint token if tokenContract and tokenId are not supplied
@@ -31,6 +30,7 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
         } else if (IERC721(tokenContract).ownerOf(tokenId) != _msgSender()) {
             revert("createAccount caller is not an owner!");
         }
+        uint salt = 0;
 
         bytes memory code = _creationCode(
             implementation,
@@ -44,13 +44,23 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
             bytes32(salt),
             keccak256(code)
         );
+        // if account already exist ,increment salt
+        if (_account.code.length != 0) {
+            // loop to find salt to create non-colliding account
+            while (salt >= 0) {
+                salt++;
+                address acc = Create2.computeAddress(bytes32(salt), keccak256(code));
+                if (acc.code.length == 0) {
+                    break;
+                }
+            }
 
-        if (_account.code.length != 0) return _account;
+        }
 
         _account = Create2.deploy(0, bytes32(salt), code);
 
         if (initData.length != 0) {
-            (bool success, ) = _account.call(initData);
+            (bool success,) = _account.call(initData);
             if (!success) revert InitializationFailed();
         }
 
@@ -88,15 +98,15 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
         uint256 salt_
     ) internal pure returns (bytes memory) {
         return
-            abi.encodePacked(
-                hex"3d60ad80600a3d3981f3363d3d373d3d3d363d73",
-                implementation_,
-                hex"5af43d82803e903d91602b57fd5bf3",
-                abi.encode(salt_, chainId_, tokenContract_, tokenId_)
-            );
+        abi.encodePacked(
+            hex"3d60ad80600a3d3981f3363d3d373d3d3d363d73",
+            implementation_,
+            hex"5af43d82803e903d91602b57fd5bf3",
+            abi.encode(salt_, chainId_, tokenContract_, tokenId_)
+        );
     }
 
-    function getMax() pure public returns(uint256){
+    function getMax() pure public returns (uint256){
         return type(uint256).max;
 
     }
