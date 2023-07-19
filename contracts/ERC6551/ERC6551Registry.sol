@@ -44,17 +44,11 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
             bytes32(salt),
             keccak256(code)
         );
-        // if account already exist ,increment salt
-        if (_account.code.length != 0) {
-            // loop to find salt to create non-colliding account
-            while (salt >= 0) {
-                salt++;
-                address acc = Create2.computeAddress(bytes32(salt), keccak256(code));
-                if (acc.code.length == 0) {
-                    break;
-                }
-            }
 
+        // loop to find salt to create non-colliding account
+        while (_account.code.length != 0) {
+            salt++;
+            _account = Create2.computeAddress(bytes32(salt), keccak256(code));
         }
 
         _account = Create2.deploy(0, bytes32(salt), code);
