@@ -70,7 +70,12 @@ describe('Default ERC6551 Account ', function () {
       const AC = await ethers.getContractFactory('DefaultERC6551Account');
       const ac = await AC.attach(accountAddress);
 
-      const callData1 = encodeCalldata('successCall1(address,uint256)', [[acc1.address, 1]]);
+      const callData1 = encodeCalldata('successCall1(address,uint256)', [
+        ['address', acc1.address],
+        ['uint256', 1],
+      ]);
+
+      // const callData1 = encodeCalldata('successCall1(address,uint256)', [[acc1.address, 1]]);
       const callData2 = encodeCalldata('successCall2(address,address)', [
         acc1.address,
         acc2.address,
@@ -119,7 +124,10 @@ describe('Default ERC6551 Account ', function () {
       const AC = await ethers.getContractFactory('DefaultERC6551Account');
       const ac = await AC.attach(accountAddress);
 
-      const callData1 = encodeCalldata('failedCall1(address,uint256)', [[acc1.address, 1]]);
+      const callData1 = encodeCalldata('failedCall1(address,uint256)', [
+        ['address', acc1.address],
+        ['uint256', 1],
+      ]);
       const callData2 = encodeCalldata('failedCall2(address,address)', [
         acc1.address,
         acc2.address,
@@ -185,7 +193,10 @@ describe('Default ERC6551 Account ', function () {
       const AC = await ethers.getContractFactory('DefaultERC6551Account');
       const ac = await AC.attach(accountAddress);
 
-      const callData0 = encodeCalldata('successCall1(address,uint256)', [[acc1.address, 1]]);
+      const callData0 = encodeCalldata('successCall1(address,uint256)', [
+        ['address', acc1.address],
+        ['uint256', 1],
+      ]);
       const callData00 = encodeCalldata('successCall2(address,address)', [
         acc1.address,
         acc2.address,
@@ -195,7 +206,10 @@ describe('Default ERC6551 Account ', function () {
       await expect(ac.executeCall(mockCall.address, 0, callData0)).to.emit(mockCall, 'Success1');
       await expect(ac.executeCall(mockCall.address, 0, callData00)).to.emit(mockCall, 'Success2');
 
-      const callData1 = encodeCalldata('failedCall1(address,uint256)', [[acc1.address, 1]]);
+      const callData1 = encodeCalldata('failedCall1(address,uint256)', [
+        ['address', acc1.address],
+        ['uint256', 1],
+      ]);
       const callData2 = encodeCalldata('failedCall2(address,address)', [
         acc1.address,
         acc2.address,
