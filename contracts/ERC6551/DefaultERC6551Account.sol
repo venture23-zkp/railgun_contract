@@ -9,73 +9,63 @@ import "./Bytecode.sol";
 import "./IERC6551Account.sol";
 
 contract DefaultERC6551Account is IERC165, IERC1271, IERC6551Account {
-    /// @dev Returns a nonce value that is updated on every successful transaction
-    //
-    /// @return The current account nonce
-    uint256 public nonce;
+  /// @dev Returns a nonce value that is updated on every successful transaction
+  //
+  /// @return The current account nonce
+  uint256 public nonce;
 
-    receive() external payable {}
+  receive() external payable {}
 
-    function executeCall(
-        address to,
-        uint256 value,
-        bytes calldata data
-    ) external payable returns (bytes memory result) {
-        require(msg.sender == owner(), "Not token owner");
+  function executeCall(
+    address to,
+    uint256 value,
+    bytes calldata data
+  ) external payable returns (bytes memory result) {
+    require(msg.sender == owner(), "Not token owner");
 
-        bool success;
-        (success, result) = to.call{value: value}(data);
+    bool success;
+    (success, result) = to.call{ value: value }(data);
 
-        if (!success) {
-            assembly {
-                revert(add(result, 32), mload(result))
-            }
-        }
-
-        ++nonce;
+    if (!success) {
+      assembly {
+        revert(add(result, 32), mload(result))
+      }
     }
 
-    function token()
-        external
-        view
-        returns (uint256 chainId, address tokenContract, uint256 tokenId)
-    {
-        uint256 length = address(this).code.length;
-        return
-            abi.decode(
-                Bytecode.codeAt(address(this), length - 0x60, length),
-                (uint256, address, uint256)
-            );
+    ++nonce;
+  }
+
+  function token() external view returns (uint256 chainId, address tokenContract, uint256 tokenId) {
+    uint256 length = address(this).code.length;
+    return
+      abi.decode(
+        Bytecode.codeAt(address(this), length - 0x60, length),
+        (uint256, address, uint256)
+      );
+  }
+
+  function owner() public view returns (address) {
+    (uint256 chainId, address tokenContract, uint256 tokenId) = this.token();
+    if (chainId != block.chainid) return address(0);
+
+    return IERC721(tokenContract).ownerOf(tokenId);
+  }
+
+  function supportsInterface(bytes4 interfaceId) public pure returns (bool) {
+    return (interfaceId == type(IERC165).interfaceId ||
+      interfaceId == type(IERC6551Account).interfaceId);
+  }
+
+  function isValidSignature(
+    bytes32 hash,
+    bytes memory signature
+  ) external view returns (bytes4 magicValue) {
+    bool isValid = SignatureChecker.isValidSignatureNow(owner(), hash, signature);
+
+    if (isValid) {
+      return IERC1271.isValidSignature.selector;
     }
 
-    function owner() public view returns (address) {
-        (uint256 chainId, address tokenContract, uint256 tokenId) = this
-            .token();
-        if (chainId != block.chainid) return address(0);
-
-        return IERC721(tokenContract).ownerOf(tokenId);
-
-    }
-
-    function supportsInterface(bytes4 interfaceId) public pure returns (bool) {
-        return (interfaceId == type(IERC165).interfaceId ||
-            interfaceId == type(IERC6551Account).interfaceId);
-    }
-
-    function isValidSignature(
-        bytes32 hash,
-        bytes memory signature
-    ) external view returns (bytes4 magicValue) {
-        bool isValid = SignatureChecker.isValidSignatureNow(
-            owner(),
-            hash,
-            signature
-        );
-
-        if (isValid) {
-            return IERC1271.isValidSignature.selector;
-        }
-
-        return "";
-    }
+    return "";
+  }
 }

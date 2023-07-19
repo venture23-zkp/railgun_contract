@@ -159,6 +159,6 @@ task('deploy:full', 'Creates full deployment')
       voting: voting.address,
       relayAdapt: relayAdapt.address,
       PoseidonT3: poseidonT3.address,
-      PoseidonT4: poseidonT4.address
+      PoseidonT4: poseidonT4.address,
     });
   });
