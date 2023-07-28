@@ -22,6 +22,7 @@ import {
   hexStringToArray,
 } from '../../helpers/global/bytes';
 import { BigNumber } from 'ethers';
+import * as hre from 'hardhat';
 
 describe('Adapt/Relay', () => {
   /**
@@ -74,9 +75,31 @@ describe('Adapt/Relay', () => {
     );
     const weth9 = await WETH9.deploy();
 
+    // Deploy test ERC721 and approve for shield
+    const TestERC721 = await ethers.getContractFactory('TestERC721');
+    const testERC721 = await TestERC721.deploy();
+    const testERC721BypassSigner = testERC721.connect(snarkBypassSigner);
+    await testERC721.setApprovalForAll(railgunSmartWallet.address, true);
+    await testERC721BypassSigner.setApprovalForAll(railgunSmartWallet.address, true);
+
+    // Deploy Default Account Implementation
+    const DefaultAccount = await ethers.getContractFactory('DefaultERC6551Account');
+    const defaultAccount = await DefaultAccount.deploy();
+
+    //Deploy Default ERC6551 Registry
+    const DefaultRegistry = await ethers.getContractFactory('ERC6551Registry');
+    const defaultRegistry = await DefaultRegistry.deploy(
+      defaultAccount.address,
+      testERC721.address,
+    );
+
     // Deploy RelayAdapt
     const RelayAdapt = await ethers.getContractFactory('RelayAdapt');
-    const relayAdapt = await RelayAdapt.deploy(railgunSmartWallet.address, weth9.address);
+    const relayAdapt = await RelayAdapt.deploy(
+      railgunSmartWallet.address,
+      weth9.address,
+      defaultRegistry.address,
+    );
 
     // Get alternative signers
     const railgunSmartWalletSnarkBypass = railgunSmartWallet.connect(snarkBypassSigner);
@@ -116,13 +139,6 @@ describe('Adapt/Relay', () => {
       }),
     );
 
-    // Deploy test ERC721 and approve for shield
-    const TestERC721 = await ethers.getContractFactory('TestERC721');
-    const testERC721 = await TestERC721.deploy();
-    const testERC721BypassSigner = testERC721.connect(snarkBypassSigner);
-    await testERC721.setApprovalForAll(railgunSmartWallet.address, true);
-    await testERC721BypassSigner.setApprovalForAll(railgunSmartWallet.address, true);
-
     return {
       chainID,
       primaryAccount,
@@ -140,6 +156,8 @@ describe('Adapt/Relay', () => {
       testERC721,
       testERC721BypassSigner,
       weth9,
+      defaultAccount,
+      defaultRegistry,
     };
   }
 
@@ -489,6 +507,109 @@ describe('Adapt/Relay', () => {
 
     // Relay txn
     const relayTx = await relayAdapt.relay([], actionData, { gasLimit: 11000000n });
+
+    // Check tokens moved
+    expect(await testERC721.ownerOf(1n)).to.equal(railgunSmartWallet.address);
+    expect(await testERC721.ownerOf(2n)).to.equal(railgunSmartWallet.address);
+    expect(await testERC721.ownerOf(3n)).to.equal(railgunSmartWallet.address);
+  });
+  it('Should receive ERC721 and create account for it', async () => {
+    const { relayAdapt, railgunSmartWallet, testERC721, defaultRegistry, defaultAccount } =
+      await loadFixture(deploy);
+    // Create deposit note
+    const depositNote = new Note(
+      randomBytes(32),
+      randomBytes(32),
+      0n,
+      randomBytes(16),
+      {
+        tokenType: TokenType.ERC721,
+        tokenAddress: testERC721.address,
+        tokenSubID: BigInt(0n),
+      },
+      '',
+    );
+
+    // Get shield request
+    const shieldRequest = await depositNote.encryptForShield();
+
+    // Create actionData
+    const actionData = {
+      random: randomBytes(31),
+      requireSuccess: true,
+      minGasLimit: 1000000n,
+      calls: [
+        {
+          to: testERC721.address,
+          data: hexStringToArray(
+            testERC721.interface.encodeFunctionData('safeMint', [relayAdapt.address, 1n]),
+          ),
+          value: 0n,
+        },
+        {
+          to: testERC721.address,
+          data: hexStringToArray(
+            testERC721.interface.encodeFunctionData('safeMint', [relayAdapt.address, 2n]),
+          ),
+          value: 0n,
+        },
+        {
+          to: testERC721.address,
+          data: hexStringToArray(
+            testERC721.interface.encodeFunctionData('safeMint', [relayAdapt.address, 3n]),
+          ),
+          value: 0n,
+        },
+        {
+          to: relayAdapt.address,
+          data: hexStringToArray(relayAdapt.interface.encodeFunctionData('createNftAccounts')),
+          value: 0n,
+        },
+        {
+          to: relayAdapt.address,
+          data: hexStringToArray(
+            relayAdapt.interface.encodeFunctionData('shield', [[shieldRequest]]),
+          ),
+          value: 0n,
+        },
+      ],
+    };
+
+    // Relay txn
+    const relayTx = await relayAdapt.relay([], actionData, { gasLimit: 11000000n });
+
+    // Check account created
+    //Testing with another account
+    const chainId = BigInt(await ethers.provider.send('eth_chainId', []));
+    const AC = await ethers.getContractFactory('DefaultERC6551Account');
+    const accountAddress1 = await defaultRegistry.account(
+      defaultAccount.address,
+      chainId,
+      testERC721.address,
+      1n,
+      0,
+    );
+    const accountAddress2 = await defaultRegistry.account(
+      defaultAccount.address,
+      chainId,
+      testERC721.address,
+      2n,
+      0,
+    );
+    const accountAddress3 = await defaultRegistry.account(
+      defaultAccount.address,
+      chainId,
+      testERC721.address,
+      3n,
+      0,
+    );
+    const ac1 = await AC.attach(accountAddress1);
+    const ac2 = await AC.attach(accountAddress2);
+    const ac3 = await AC.attach(accountAddress3);
+
+    expect(await ac1.owner()).to.equal(railgunSmartWallet.address);
+    expect(await ac2.owner()).to.equal(railgunSmartWallet.address);
+    expect(await ac3.owner()).to.equal(railgunSmartWallet.address);
 
     // Check tokens moved
     expect(await testERC721.ownerOf(1n)).to.equal(railgunSmartWallet.address);
