@@ -29,38 +29,50 @@ describe('Default ERC6551 Account ', function () {
   // We use loadFixture to run this setup once, snapshot that state,
   // and reset Hardhat Network to that snapshot in every test.
   async function deployContracts() {
-    const name = 'Registry NFT';
-    const symbol = 'RNFT';
-
     const Registry = await hre.ethers.getContractFactory('ERC6551Registry');
     const Account = await hre.ethers.getContractFactory('DefaultERC6551Account');
-    const registry = await Registry.deploy(name, symbol);
+
+    const MockNft = await ethers.getContractFactory('TestERC721');
+    const mockNft = await MockNft.deploy();
     const account = await Account.deploy();
+
+    const registry = await Registry.deploy(account.address, mockNft.address);
     await registry.deployed();
     await account.deployed();
-    return { registry, account };
+    return { registry, account, mockNft };
   }
 
   describe('Create Account,Run execute call ', function () {
     it('Should create account and execute a multicall', async function () {
-      const { registry, account } = await loadFixture(deployContracts);
+      const { registry, account, mockNft } = await loadFixture(deployContracts);
 
       // params to create a new account
       const chainId = BigInt(await ethers.provider.send('eth_chainId', []));
-      const tokenAddress = ethers.constants.AddressZero;
+      const tokenId = 1;
       const salt = 0;
       const initData: [] = [];
       const [acc1, acc2, acc3] = await ethers.getSigners();
 
-      //creating an account with acc1
-      await registry.createAccount(account.address, chainId, tokenAddress, 0, initData);
+      // minting nfts
+      await mockNft.mint(acc1.address, tokenId);
+      await mockNft.mint(acc1.address, tokenId + 1);
+
+      //creating  accounts with acc1
+      await registry['createAccount(address,uint256,address,uint256,bytes)'](
+        account.address,
+        chainId,
+        mockNft.address,
+        tokenId,
+        initData,
+      );
+      await registry['createAccount(address,uint256)'](mockNft.address, tokenId + 1);
 
       // getting the created account
       const accountAddress = await registry.account(
         account.address,
         chainId,
-        registry.address,
-        0,
+        mockNft.address,
+        tokenId,
         salt,
       );
 
@@ -92,29 +104,62 @@ describe('Default ERC6551 Account ', function () {
       await expect(ac.connect(acc3).executeCall(mockCall.address, 0, callData2)).to.be.revertedWith(
         'Not token owner',
       );
+
+      //Testing with another account
+      const accountAddress1 = await registry.account(
+        account.address,
+        chainId,
+        mockNft.address,
+        tokenId + 1,
+        salt,
+      );
+      const ac1 = await AC.attach(accountAddress1);
+
+      // validate owner can execute call on other contract successfully
+      await expect(ac1.executeCall(mockCall.address, 0, callData1)).to.emit(mockCall, 'Success1');
+      await expect(ac1.executeCall(mockCall.address, 0, callData2)).to.emit(mockCall, 'Success2');
+
+      // invalid token owner cant execute call
+      await expect(
+        ac1.connect(acc2).executeCall(mockCall.address, 0, callData2),
+      ).to.be.revertedWith('Not token owner');
+      await expect(
+        ac1.connect(acc3).executeCall(mockCall.address, 0, callData2),
+      ).to.be.revertedWith('Not token owner');
     });
   });
 
   describe('Create Account,Run Failed execute calls ', function () {
     it('Should create account and execute a multicall', async function () {
-      const { registry, account } = await loadFixture(deployContracts);
+      const { registry, account, mockNft } = await loadFixture(deployContracts);
 
       // params to create a new account
       const chainId = BigInt(await ethers.provider.send('eth_chainId', []));
-      const tokenAddress = ethers.constants.AddressZero;
+      const tokenId = 10;
       const salt = 0;
       const initData: [] = [];
       const [acc1, acc2, acc3] = await ethers.getSigners();
 
-      //creating an account with acc1
-      await registry.createAccount(account.address, chainId, tokenAddress, 0, initData);
+      // minting nfts
+      await mockNft.mint(acc1.address, tokenId);
+      await mockNft.mint(acc1.address, tokenId + 1);
+
+      //creating  accounts with acc1
+      await registry['createAccount(address,uint256,address,uint256,bytes)'](
+        account.address,
+        chainId,
+        mockNft.address,
+        tokenId,
+        initData,
+      );
+      await registry['createAccount(address,uint256)'](mockNft.address, tokenId + 1);
 
       // getting the created account
       const accountAddress = await registry.account(
         account.address,
         chainId,
-        registry.address,
-        0,
+        mockNft.address,
+        tokenId,
         salt,
       );
 
@@ -150,39 +195,70 @@ describe('Default ERC6551 Account ', function () {
       await expect(ac.connect(acc3).executeCall(mockCall.address, 0, callData2)).to.be.revertedWith(
         'Not token owner',
       );
+
+      //Testing with another account
+      const accountAddress1 = await registry.account(
+        account.address,
+        chainId,
+        mockNft.address,
+        tokenId + 1,
+        salt,
+      );
+      const ac1 = await AC.attach(accountAddress1);
+
+      // validate owner can execute call on other contract successfully
+      await expect(ac1.executeCall(mockCall.address, 0, callData1)).to.be.revertedWithCustomError(
+        mockCall,
+        'Failed1',
+      );
+      await expect(ac1.executeCall(mockCall.address, 0, callData2)).to.be.revertedWithCustomError(
+        mockCall,
+        'Failed2',
+      );
+
+      // invalid token owner cant execute call
+      await expect(
+        ac1.connect(acc2).executeCall(mockCall.address, 0, callData2),
+      ).to.be.revertedWith('Not token owner');
+      await expect(
+        ac1.connect(acc3).executeCall(mockCall.address, 0, callData2),
+      ).to.be.revertedWith('Not token owner');
     });
   });
 
   describe('Create Account With Different NFT address', function () {
     it('Should create account and mint nft', async function () {
-      const { registry, account } = await loadFixture(deployContracts);
+      const { registry, account, mockNft } = await loadFixture(deployContracts);
       const [acc1, acc2, acc3] = await ethers.getSigners();
 
       // params to create a new account
 
       // Deploying the mock nft
-      const MockNft = await ethers.getContractFactory('TestERC721');
-      const mockNft = await MockNft.deploy();
+
       const chainId = BigInt(await ethers.provider.send('eth_chainId', []));
-      const tokenAddress = mockNft.address;
       const tokenId = 1;
       const salt = 0;
       const initData: [] = [];
 
-      //Minting the nft
-      await mockNft.safeMint(acc1.address, tokenId);
+      // minting nfts
+      await mockNft.mint(acc1.address, tokenId);
+      await mockNft.mint(acc1.address, tokenId + 1);
 
-      //validation of the nft owner
-      expect(await mockNft.ownerOf(tokenId)).to.equal(acc1.address);
-
-      //creating an account with acc1
-      await registry.createAccount(account.address, chainId, tokenAddress, tokenId, initData);
+      //creating  accounts with acc1
+      await registry['createAccount(address,uint256,address,uint256,bytes)'](
+        account.address,
+        chainId,
+        mockNft.address,
+        tokenId,
+        initData,
+      );
+      await registry['createAccount(address,uint256)'](mockNft.address, tokenId + 1);
 
       // getting the created account
       const accountAddress = await registry.account(
         account.address,
         chainId,
-        tokenAddress,
+        mockNft.address,
         tokenId,
         salt,
       );
@@ -232,6 +308,34 @@ describe('Default ERC6551 Account ', function () {
       await expect(ac.connect(acc3).executeCall(mockCall.address, 0, callData2)).to.be.revertedWith(
         'Not token owner',
       );
+
+      //Testing with another account
+      const accountAddress1 = await registry.account(
+        account.address,
+        chainId,
+        mockNft.address,
+        tokenId + 1,
+        salt,
+      );
+      const ac1 = await AC.attach(accountAddress1);
+
+      // validate owner can execute call on other contract successfully
+      await expect(ac1.executeCall(mockCall.address, 0, callData1)).to.be.revertedWithCustomError(
+        mockCall,
+        'Failed1',
+      );
+      await expect(ac1.executeCall(mockCall.address, 0, callData2)).to.be.revertedWithCustomError(
+        mockCall,
+        'Failed2',
+      );
+
+      // invalid token owner cant execute call
+      await expect(
+        ac1.connect(acc2).executeCall(mockCall.address, 0, callData2),
+      ).to.be.revertedWith('Not token owner');
+      await expect(
+        ac1.connect(acc3).executeCall(mockCall.address, 0, callData2),
+      ).to.be.revertedWith('Not token owner');
     });
   });
 });
