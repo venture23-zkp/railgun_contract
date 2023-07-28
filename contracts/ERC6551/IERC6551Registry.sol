@@ -30,6 +30,8 @@ interface IERC6551Registry {
     bytes calldata initData
   ) external returns (address);
 
+  function createAccount(address tokenContract, uint256 tokenId) external returns (address);
+
   /// @dev Returns the computed address of a token bound account
   ///
   /// @return The computed address of the account
