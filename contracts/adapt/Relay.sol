@@ -9,9 +9,11 @@ import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
+import { IERC6551Registry } from "../ERC6551/IERC6551Registry.sol";
 import { IWBase } from "./IWBase.sol";
 import { VERIFICATION_BYPASS, Transaction, ShieldRequest, ShieldCiphertext, CommitmentPreimage, TokenData, TokenType } from "../logic/Globals.sol";
 import { RailgunSmartWallet } from "../logic/RailgunSmartWallet.sol";
+import "../ERC6551/IERC6551Account.sol";
 
 /**
  * @title Relay Adapt
@@ -27,7 +29,7 @@ contract RelayAdapt is IERC721Receiver {
   bool private isExecuting = false;
   mapping(address => uint256[]) public receivedERC721;
   mapping(address => bool) receivedERC721PendingShields;
-
+  address[] public tokenContracts;
   struct Call {
     address to;
     bytes data;
@@ -58,6 +60,7 @@ contract RelayAdapt is IERC721Receiver {
   // External contract addresses
   RailgunSmartWallet public railgun;
   IWBase public wBase;
+  IERC6551Registry public accountRegistry;
 
   /**
    * @notice only allows self calls to these contracts if contract is executing
@@ -75,9 +78,10 @@ contract RelayAdapt is IERC721Receiver {
   /**
    * @notice Sets Railgun contract and wBase address
    */
-  constructor(RailgunSmartWallet _railgun, IWBase _wBase) {
+  constructor(RailgunSmartWallet _railgun, IWBase _wBase, IERC6551Registry _accountRegistry) {
     railgun = _railgun;
     wBase = _wBase;
+    accountRegistry = _accountRegistry;
   }
 
   /**
@@ -194,6 +198,7 @@ contract RelayAdapt is IERC721Receiver {
           }
           //          delete receivedERC721[_shieldRequests[i].preimage.token.tokenAddress];
           delete receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress];
+          delete tokenContracts;
         } else {
           filteredShieldRequests[filteredIndex] = _shieldRequests[i];
           filteredShieldRequests[filteredIndex].preimage.value = values[i];
@@ -388,6 +393,27 @@ contract RelayAdapt is IERC721Receiver {
   receive() external payable {}
 
   /**
+   * @notice Creates accounts for received nfts
+   */
+  function createNftAccounts() external onlySelfIfExecuting {
+    uint totalTokenContracts = tokenContracts.length;
+    //loop through the received token contracts
+    for (uint i = 0; i < totalTokenContracts; i++) {
+      uint tokensReceived = receivedERC721[tokenContracts[i]].length;
+
+      // loop through received nft for the current token contract
+      for (uint j; j < tokensReceived; j++) {
+        uint tokenId = receivedERC721[tokenContracts[i]][j];
+
+        //create account for the nft through registry
+        accountRegistry.createAccount(tokenContracts[i], tokenId);
+      }
+    }
+    // delete the token contract details after creating account
+    delete tokenContracts;
+  }
+
+  /**
    * @dev Whenever an {IERC721} `tokenId` token is transferred to this contract via {IERC721-safeTransferFrom}
    * by `operator` from `from`, this function is called.
    *
@@ -407,7 +433,11 @@ contract RelayAdapt is IERC721Receiver {
     if (!tokenContract.isContract()) {
       revert("msg.sender is not an ERC721 contract!");
     }
+    if (receivedERC721[tokenContract].length == 0) {
+      tokenContracts.push(tokenContract);
+    }
     receivedERC721[tokenContract].push(tokenId);
+
     return IERC721Receiver.onERC721Received.selector;
   }
 }
