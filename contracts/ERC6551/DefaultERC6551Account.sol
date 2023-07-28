@@ -16,6 +16,13 @@ contract DefaultERC6551Account is IERC165, IERC1271, IERC6551Account {
 
   receive() external payable {}
 
+  /**
+   * @notice Executes  a call to the given address with given data
+   * @param to - the address to call
+   * @param value - amount of eth to sent for call
+   * @param data - encoded bytes function call  data for the contract call
+   */
+
   function executeCall(
     address to,
     uint256 value,
@@ -35,6 +42,12 @@ contract DefaultERC6551Account is IERC165, IERC1271, IERC6551Account {
     ++nonce;
   }
 
+  /**
+   * @notice Returns the details of the account
+   * @param chainId - the chain id for which the account was created
+   * @param tokenContract - the token contract of the account
+   * @param tokenId - the token id of the account
+   */
   function token() external view returns (uint256 chainId, address tokenContract, uint256 tokenId) {
     uint256 length = address(this).code.length;
     return
@@ -43,6 +56,10 @@ contract DefaultERC6551Account is IERC165, IERC1271, IERC6551Account {
         (uint256, address, uint256)
       );
   }
+
+  /**
+   * @notice returns the owner of the account
+   */
 
   function owner() public view returns (address) {
     (uint256 chainId, address tokenContract, uint256 tokenId) = this.token();
