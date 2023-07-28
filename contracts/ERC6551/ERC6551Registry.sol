@@ -1,32 +1,58 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import { ERC721Enumerable } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "./IERC6551Registry.sol";
 
-contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
+contract ERC6551Registry is IERC6551Registry, Ownable {
   error InitializationFailed();
 
-  constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}
+  // default account implementation
+  address public defaultImplementation;
 
+  // default token contract
+  address public defaultToken;
+
+  constructor(address _defaultImplementation, address _defaultToken) Ownable() {
+    defaultImplementation = _defaultImplementation;
+    defaultToken = _defaultToken;
+  }
+
+  /**
+   * @notice Creates a account for the given params
+   * @param implementation - Implementation address of account
+   * @param chainId - Chain id of the network
+   * @param tokenContract - The address of nft token contract
+   * @param tokenId - The nft token id associated with the account to be created
+   * @param initData - The data to initialize the account after creating it
+   */
   function createAccount(
     address implementation,
     uint256 chainId,
     address tokenContract,
     uint256 tokenId,
-    bytes calldata initData
+    bytes memory initData
   ) external returns (address) {
-    // mint token if tokenContract and tokenId are not supplied
-    if (tokenContract == address(0) && tokenId == 0) {
-      tokenId = totalSupply();
-      tokenContract = address(this);
-      _safeMint(_msgSender(), tokenId);
-    } else if (IERC721(tokenContract).ownerOf(tokenId) != _msgSender()) {
-      revert("createAccount caller is not an owner!");
-    }
+    return _createAccount(implementation, chainId, tokenContract, tokenId, initData);
+  }
+
+  function createAccount(address tokenContract, uint256 tokenId) external returns (address) {
+    return _createAccount(defaultImplementation, block.chainid, tokenContract, tokenId, "");
+  }
+
+  function _createAccount(
+    address implementation,
+    uint256 chainId,
+    address tokenContract,
+    uint256 tokenId,
+    bytes memory initData
+  ) internal returns (address) {
+    require(
+      IERC721(tokenContract).ownerOf(tokenId) == _msgSender(),
+      "Only owner can create a account"
+    );
     uint salt = 0;
 
     bytes memory code = _creationCode(implementation, chainId, tokenContract, tokenId, salt);
@@ -51,6 +77,14 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
     return _account;
   }
 
+  /**
+   * @notice Returns the account for the given params
+   * @param implementation - Implementation address of account
+   * @param chainId - Chain id of the network
+   * @param tokenContract - The address of nft token contract
+   * @param tokenId - The nft token id associated with the account to be created
+   * @param salt - The salt that was used to create a account
+   */
   function account(
     address implementation,
     uint256 chainId,
@@ -79,9 +113,5 @@ contract ERC6551Registry is IERC6551Registry, ERC721Enumerable {
         hex"5af43d82803e903d91602b57fd5bf3",
         abi.encode(salt_, chainId_, tokenContract_, tokenId_)
       );
-  }
-
-  function getMax() public pure returns (uint256) {
-    return type(uint256).max;
   }
 }
