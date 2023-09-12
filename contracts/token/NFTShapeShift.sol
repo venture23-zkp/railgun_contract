@@ -10,6 +10,7 @@ contract NFTShapeShift is ERC721A, Ownable {
   /* TOKEN URI TRANSFORMER VARIABLES */
   string public baseURI;
   address public railgun;
+  mapping (uint256 => bytes32) public  encryptedMetadata;
 
   /* CONSTRUCTOR */
 
@@ -23,6 +24,11 @@ contract NFTShapeShift is ERC721A, Ownable {
 
   function setRailgunAddress(address _railgunContract) external onlyOwner {
     railgun = _railgunContract;
+  }
+
+  function setEncryptedMetadata(uint256 tokenId,bytes32 metadata) public {
+    require(ownerOf(tokenId)== msg.sender,"Only token owner can set metadata");
+    encryptedMetadata[tokenId] = metadata;
   }
 
   /* TOKEN URI GETTER */
