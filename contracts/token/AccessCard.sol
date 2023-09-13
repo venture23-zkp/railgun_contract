@@ -6,7 +6,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { ERC721A } from "erc721a/contracts/ERC721A.sol";
 
-contract NFTShapeShift is ERC721A, Ownable {
+contract AccessCard is ERC721A, Ownable {
   /* TOKEN URI TRANSFORMER VARIABLES */
   string public baseURI;
   address public railgun;
@@ -43,13 +43,10 @@ contract NFTShapeShift is ERC721A, Ownable {
     // Else return standard token path
     return string(abi.encodePacked(baseURI, "/normal/", _toString(tokenId)));
   }
-}
-
-contract NFTShapeShiftTestStub is NFTShapeShift {
-  constructor(string memory _name, string memory _symbol) NFTShapeShift(_name, _symbol) {}
 
   function mint() external {
     // Mint for debugging purposes
     ERC721A._mint(msg.sender, 1);
   }
 }
+

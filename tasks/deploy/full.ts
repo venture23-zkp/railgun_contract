@@ -48,7 +48,7 @@ task('deploy:full', 'Creates full deployment')
     const Voting = await ethers.getContractFactory('Voting');
     const DefaultAccount = await ethers.getContractFactory('DefaultERC6551Account');
     const DefaultRegistry = await ethers.getContractFactory('ERC6551Registry');
-    const AccessCard = await ethers.getContractFactory('NFTShapeShift');
+    const AccessCard = await ethers.getContractFactory('AccessCard');
 
     // Deploy Poseidon libraries
     const poseidonT3 = await PoseidonT3.deploy();
