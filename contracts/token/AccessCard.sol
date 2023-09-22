@@ -46,7 +46,7 @@ contract AccessCard is ERC721A, Ownable {
 
   function mint() external {
     // Mint for debugging purposes
-    ERC721A._mint(msg.sender, 1);
+    ERC721A._safeMint(msg.sender, 1);
   }
 }
 
