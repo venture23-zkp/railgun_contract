@@ -44,8 +44,9 @@ contract AccessCard is ERC721A, Ownable {
     return string(abi.encodePacked(baseURI, "/normal/", _toString(tokenId)));
   }
 
-  function mint() external {
-    // Mint for debugging purposes
+  function mint(bytes32 metadata) external {
+    //setting the metadata for token id to be minted
+    encryptedMetadata[ERC721A._nextTokenId()] = metadata;
     ERC721A._safeMint(msg.sender, 1);
   }
 }
