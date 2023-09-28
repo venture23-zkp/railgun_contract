@@ -10,7 +10,7 @@ contract AccessCard is ERC721A, Ownable {
   /* TOKEN URI TRANSFORMER VARIABLES */
   string public baseURI;
   address public railgun;
-  mapping (uint256 => bytes32) public  encryptedMetadata;
+  mapping (uint256 => bytes) public  encryptedMetadata;
 
   /* CONSTRUCTOR */
 
@@ -26,7 +26,7 @@ contract AccessCard is ERC721A, Ownable {
     railgun = _railgunContract;
   }
 
-  function setEncryptedMetadata(uint256 tokenId,bytes32 metadata) public {
+  function setEncryptedMetadata(uint256 tokenId,bytes memory  metadata) public {
     require(ownerOf(tokenId)== msg.sender,"Only token owner can set metadata");
     encryptedMetadata[tokenId] = metadata;
   }
@@ -44,7 +44,7 @@ contract AccessCard is ERC721A, Ownable {
     return string(abi.encodePacked(baseURI, "/normal/", _toString(tokenId)));
   }
 
-  function mint(bytes32 metadata) external {
+  function mint(bytes memory  metadata) external {
     //setting the metadata for token id to be minted
     encryptedMetadata[ERC721A._nextTokenId()] = metadata;
     ERC721A._safeMint(msg.sender, 1);
