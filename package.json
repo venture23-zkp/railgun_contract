@@ -35,6 +35,7 @@
     "@typescript-eslint/parser": "^5.49.0",
     "chai": "^4.3.7",
     "circomlibjs": "^0.1.7",
+    "erc721a": "^4.2.3",
     "eslint": "^8.32.0",
     "eslint-config-airbnb-typescript": "^17.0.0",
     "eslint-plugin-import": "^2.27.5",
@@ -58,6 +59,7 @@
   "dependencies": {
     "@arbitrum/nitro-contracts": "1.0.0-beta.8",
     "@openzeppelin/contracts": "^4.8.1",
-    "@openzeppelin/contracts-upgradeable": "^4.8.1"
+    "@openzeppelin/contracts-upgradeable": "^4.8.1",
+    "dotenv": "^16.1.1"
   }
 }

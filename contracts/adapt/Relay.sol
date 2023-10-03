@@ -6,10 +6,14 @@ pragma abicoder v2;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
+import { IERC6551Registry } from "../ERC6551/IERC6551Registry.sol";
 import { IWBase } from "./IWBase.sol";
 import { VERIFICATION_BYPASS, Transaction, ShieldRequest, ShieldCiphertext, CommitmentPreimage, TokenData, TokenType } from "../logic/Globals.sol";
 import { RailgunSmartWallet } from "../logic/RailgunSmartWallet.sol";
+import "../ERC6551/IERC6551Account.sol";
 
 /**
  * @title Relay Adapt
@@ -17,12 +21,15 @@ import { RailgunSmartWallet } from "../logic/RailgunSmartWallet.sol";
  * @notice Multicall adapt contract for Railgun with relayer support
  */
 
-contract RelayAdapt {
+contract RelayAdapt is IERC721Receiver {
+  using Address for address;
   using SafeERC20 for IERC20;
 
   // Set to true if contract is executing
   bool private isExecuting = false;
-
+  mapping(address => uint256[]) public receivedERC721;
+  mapping(address => bool) receivedERC721PendingShields;
+  address[] public tokenContracts;
   struct Call {
     address to;
     bytes data;
@@ -53,6 +60,7 @@ contract RelayAdapt {
   // External contract addresses
   RailgunSmartWallet public railgun;
   IWBase public wBase;
+  IERC6551Registry public accountRegistry;
 
   /**
    * @notice only allows self calls to these contracts if contract is executing
@@ -70,9 +78,10 @@ contract RelayAdapt {
   /**
    * @notice Sets Railgun contract and wBase address
    */
-  constructor(RailgunSmartWallet _railgun, IWBase _wBase) {
+  constructor(RailgunSmartWallet _railgun, IWBase _wBase, IERC6551Registry _accountRegistry) {
     railgun = _railgun;
     wBase = _wBase;
+    accountRegistry = _accountRegistry;
   }
 
   /**
@@ -114,14 +123,31 @@ contract RelayAdapt {
         // ERC721 token
         IERC721 token = IERC721(_shieldRequests[i].preimage.token.tokenAddress);
 
-        // Approve NFT for shield
-        token.approve(address(railgun), _shieldRequests[i].preimage.token.tokenSubID);
-
-        // Set value to 1
-        values[i] = 1;
-
-        // Increment number of valid tokens
-        numValidTokens += 1;
+        if (
+          _shieldRequests[i].preimage.value == 0 &&
+          _shieldRequests[i].preimage.token.tokenSubID == 0 &&
+          receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length > 0
+        ) {
+          if (!receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress]) {
+            for (
+              uint256 j = 0;
+              j < receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length;
+              j += 1
+            ) {
+              token.approve(
+                address(railgun),
+                receivedERC721[_shieldRequests[i].preimage.token.tokenAddress][j]
+              );
+              values[i] += 1;
+              numValidTokens += 1;
+            }
+            receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress] = true;
+          }
+        } else {
+          token.approve(address(railgun), _shieldRequests[i].preimage.token.tokenSubID);
+          values[i] = 1;
+          numValidTokens += 1;
+        }
       } else {
         // ERC1155 token
         revert("RelayAdapt: ERC1155 not yet supported");
@@ -141,7 +167,10 @@ contract RelayAdapt {
 
     // Loop through shields and push non-0 values to filtered array
     for (uint256 i = 0; i < _shieldRequests.length; i += 1) {
-      if (values[i] != 0) {
+      if (values[i] == 0) {
+        continue;
+      }
+      if (_shieldRequests[i].preimage.token.tokenType == TokenType.ERC20) {
         // Push to filtered array
         filteredShieldRequests[filteredIndex] = _shieldRequests[i];
 
@@ -150,6 +179,31 @@ contract RelayAdapt {
 
         // Increment index of filtered arrays
         filteredIndex += 1;
+      } else if (_shieldRequests[i].preimage.token.tokenType == TokenType.ERC721) {
+        if (
+          _shieldRequests[i].preimage.value == 0 &&
+          _shieldRequests[i].preimage.token.tokenSubID == 0 &&
+          receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length > 0
+        ) {
+          uint loop = receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].length;
+          for (uint256 j = 0; j < loop; j += 1) {
+            filteredShieldRequests[filteredIndex] = _shieldRequests[i];
+            filteredShieldRequests[filteredIndex].preimage.value = 1;
+            uint tokenId = receivedERC721[_shieldRequests[i].preimage.token.tokenAddress][
+              loop - j - 1
+            ];
+            receivedERC721[_shieldRequests[i].preimage.token.tokenAddress].pop();
+            filteredShieldRequests[filteredIndex].preimage.token.tokenSubID = tokenId;
+            filteredIndex += 1;
+          }
+          //          delete receivedERC721[_shieldRequests[i].preimage.token.tokenAddress];
+          delete receivedERC721PendingShields[_shieldRequests[i].preimage.token.tokenAddress];
+          delete tokenContracts;
+        } else {
+          filteredShieldRequests[filteredIndex] = _shieldRequests[i];
+          filteredShieldRequests[filteredIndex].preimage.value = values[i];
+          filteredIndex += 1;
+        }
       }
     }
 
@@ -337,4 +391,53 @@ contract RelayAdapt {
   // Allow wBase contract unwrapping to pay us
   // solhint-disable-next-line no-empty-blocks
   receive() external payable {}
+
+  /**
+   * @notice Creates accounts for received nfts
+   */
+  function createNftAccounts() external onlySelfIfExecuting {
+    uint totalTokenContracts = tokenContracts.length;
+    //loop through the received token contracts
+    for (uint i = 0; i < totalTokenContracts; i++) {
+      uint tokensReceived = receivedERC721[tokenContracts[i]].length;
+
+      // loop through received nft for the current token contract
+      for (uint j; j < tokensReceived; j++) {
+        uint tokenId = receivedERC721[tokenContracts[i]][j];
+
+        //create account for the nft through registry
+        accountRegistry.createAccount(tokenContracts[i], tokenId);
+      }
+    }
+    // delete the token contract details after creating account
+    delete tokenContracts;
+  }
+
+  /**
+   * @dev Whenever an {IERC721} `tokenId` token is transferred to this contract via {IERC721-safeTransferFrom}
+   * by `operator` from `from`, this function is called.
+   *
+   * It must return its Solidity selector to confirm the token transfer.
+   * If any other value is returned or the interface is not implemented by the recipient, the transfer will be reverted.
+   *
+   * The selector can be obtained in Solidity with `IERC721Receiver.onERC721Received.selector`.
+   */
+  function onERC721Received(
+    address, // operator,
+    address, // from,
+    uint256 tokenId,
+    bytes calldata // data
+  ) external returns (bytes4) {
+    // ensure msg.sender is ERC721 contract
+    address tokenContract = msg.sender;
+    if (!tokenContract.isContract()) {
+      revert("msg.sender is not an ERC721 contract!");
+    }
+    if (receivedERC721[tokenContract].length == 0) {
+      tokenContracts.push(tokenContract);
+    }
+    receivedERC721[tokenContract].push(tokenId);
+
+    return IERC721Receiver.onERC721Received.selector;
+  }
 }

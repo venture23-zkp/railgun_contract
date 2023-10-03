@@ -46,10 +46,20 @@ task('deploy:full', 'Creates full deployment')
     const Staking = await ethers.getContractFactory('Staking');
     const TreasuryImplementation = await ethers.getContractFactory('Treasury');
     const Voting = await ethers.getContractFactory('Voting');
+    const DefaultAccount = await ethers.getContractFactory('DefaultERC6551Account');
+    const DefaultRegistry = await ethers.getContractFactory('ERC6551Registry');
+    const AccessCard = await ethers.getContractFactory('AccessCard');
 
     // Deploy Poseidon libraries
     const poseidonT3 = await PoseidonT3.deploy();
     const poseidonT4 = await PoseidonT4.deploy();
+
+    const defaultAccount = await DefaultAccount.deploy();
+    const accessCard = await AccessCard.deploy('Railgun Access Card', 'RAC');
+    const defaultRegistry = await DefaultRegistry.deploy(
+      defaultAccount.address,
+      accessCard.address,
+    );
 
     // Get Railgun Smart Wallet
     const RailgunSmartWallet = await ethers.getContractFactory('RailgunSmartWallet', {
@@ -141,7 +151,7 @@ task('deploy:full', 'Creates full deployment')
 
     // Deploy RelayAdapt
     console.log('\nDeploying Relay Adapt');
-    const relayAdapt = await RelayAdapt.deploy(proxy.address, weth9);
+    const relayAdapt = await RelayAdapt.deploy(proxy.address, weth9, defaultRegistry.address);
     await logVerify('Relay Adapt', relayAdapt, [proxy.address, weth9]);
 
     console.log('\nDEPLOY CONFIG:');
@@ -158,5 +168,10 @@ task('deploy:full', 'Creates full deployment')
       treasuryProxy: treasuryProxy.address,
       voting: voting.address,
       relayAdapt: relayAdapt.address,
+      PoseidonT3: poseidonT3.address,
+      PoseidonT4: poseidonT4.address,
+      DefaultAccount: defaultAccount.address,
+      DefaultRegistry: defaultRegistry.address,
+      AccessCard: accessCard.address,
     });
   });
